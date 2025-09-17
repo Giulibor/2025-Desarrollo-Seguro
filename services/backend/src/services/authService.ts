@@ -42,14 +42,25 @@ class AuthService {
     });
     const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
    
-    const template = `
+    // Función para escapar HTML
+    function escapeHtml(unsafe: string): string {
+      if (!unsafe) return '';
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // CÓDIGO SEGURO - reemplazar el template vulnerable:
+    const htmlBody = `
       <html>
         <body>
-          <h1>Hello ${user.first_name} ${user.last_name}</h1>
-          <p>Click <a href="${ link }">here</a> to activate your account.</p>
+          <h1>Hello ${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</h1>
+          <p>Click <a href="${escapeHtml(link)}">here</a> to activate your account.</p>
         </body>
       </html>`;
-    const htmlBody = ejs.render(template);
     
     await transporter.sendMail({
       from: "info@example.com",

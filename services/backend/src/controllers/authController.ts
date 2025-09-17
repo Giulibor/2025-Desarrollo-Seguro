@@ -55,7 +55,16 @@ const setPassword = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 const createUser = async (req: Request, res: Response, next: NextFunction) => {
+  console.log('=== AUTH CONTROLLER DEBUG ===');
+  console.log('req.body RAW:', JSON.stringify(req.body, null, 2));
+  console.log('first_name received:', JSON.stringify(req.body.first_name));
+  console.log('first_name type:', typeof req.body.first_name);
+  
   const { username, password, email, first_name, last_name } = req.body;
+  
+  console.log('Destructured first_name:', JSON.stringify(first_name));
+  console.log('Destructured last_name:', JSON.stringify(last_name));
+  
   try {
     const user: User = {
       username,
@@ -64,9 +73,14 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
       first_name,
       last_name
     };
+    
+    console.log('User object created:', JSON.stringify(user, null, 2));
+    console.log('=== CALLING AuthService.createUser ===');
+    
     const userDB = await AuthService.createUser(user);
     res.status(201).json(userDB);
   } catch (err) {
+    console.log('Error in createUser:', err);
     next(err);
   }
 };
