@@ -48,14 +48,19 @@ class InvoiceService {
     ccv: string,
     expirationDate: string
   ) {
-    // use axios to call http://paymentBrand/payments as a POST request
-    // with the body containing ccNumber, ccv, expirationDate
-    // and handle the response accordingly
-    const paymentResponse = await axios.post(`http://${paymentBrand}/payments`, {
-      ccNumber,
-      ccv,
-      expirationDate
-    });
+    const allowedPaymentBrands: { [key: string]: string } = {
+      visa: 'http://visa/payments',
+      mastercard: 'http://mastercard/payments',
+      americanexpress: 'http://americanexpress/payments',
+    };
+
+    const url = allowedPaymentBrands[paymentBrand.toLowerCase()];
+    if (!url) {
+      throw new Error('Payment brand not allowed');
+    }
+
+    const paymentResponse = await axios.post(url, { ccNumber, ccv, expirationDate });
+
     if (paymentResponse.status !== 200) {
       throw new Error('Payment failed');
     }
@@ -86,10 +91,30 @@ class InvoiceService {
       throw new Error('Invoice not found');
     }
 
-    const filePath = `/invoices/${pdfName}`;
-    const content = await fs.readFile(filePath, 'utf-8');
-    return content;
-  }
+    const baseDir = path.resolve('./invoices');
+    const requestedPath = path.resolve(baseDir, pdfName);
+
+    if (!requestedPath.startsWith(baseDir)) {
+      console.error('Intento de path traversal detectado: ', requestedPath);
+      throw new Error('Invalid file path');
+    }
+
+    if(!pdfName.endsWith('.pdf')) {
+      console.error('Archivo no permitido: ', pdfName);
+      throw new Error('Invalid file type');
+    }
+
+    try {
+      const content = await fs.readFile(requestedPath);
+      return content;
+    } catch (error) {
+      // send the error to the standard output
+      console.error('Error reading receipt file:', error);
+      throw new Error('Receipt not found');
+    } 
+
+  };
+  
 };
 
 export default InvoiceService;
