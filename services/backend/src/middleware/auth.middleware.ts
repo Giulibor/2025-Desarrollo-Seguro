@@ -1,26 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { config } from '../config';
 
 interface JwtPayload {
   id: string;
 }
 
-export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Missing or invalid token' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
+export default function auth(req: AuthRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization || '';
+  const [, token] = header.split(' ');
+  if (!token) return res.status(401).json({ error: 'Missing token' });
   try {
-    const decoded = jwt.verify(token, "secreto_super_seguro");
-    (req as any).user = decoded;
+    const decoded = jwt.verify(token, config.jwtSecret) as { id: string };
+    req.user = { id: String(decoded.id) };  
     next();
-  } catch (err) {
-    return res.status(403).json({ message: 'Invalid token' });
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
   }
-};
-
-export default authenticateJWT;
+}

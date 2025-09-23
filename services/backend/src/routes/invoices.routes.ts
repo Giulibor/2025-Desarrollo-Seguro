@@ -1,16 +1,18 @@
+// src/routes/invoiceRoutes.ts
 import { Router } from 'express';
 import routes from '../controllers/invoiceController';
+import auth from '../middleware/auth.middleware'; 
 
 const router = Router();
 
-// GET /invoices
+router.use(auth);
+
 router.get('/', routes.listInvoices);
 
-// GET /invoices
 router.get('/:id', routes.getInvoice);
 
-// POST /invoices/:id/pay
 router.post('/:id/pay', routes.setPaymentCard);
+
 router.get('/:id/invoice', routes.getInvoicePDF);
 
 export default router;

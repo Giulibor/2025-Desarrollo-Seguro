@@ -17,17 +17,9 @@ services:
       dockerfile: DockerFile
     container_name: backend
     ports:
-      - "5000:3000"
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=user
-      - DB_PASS=password
-      - DB_NAME=jwt_api
-      - DB_PORT=5432
-      - SMTP_HOST=mailhog
-      - SMTP_PORT=1025
-      - SMTP_USER=seed
-      - SMTP_PASS=seed
+      - "5001:3000"
+    env_file:
+      - ./services/backend/.env
     restart: unless-stopped
     depends_on:
       postgres:
@@ -38,16 +30,19 @@ services:
       timeout: 5s
       retries: 5
     command: sh -c "npx knex --knexfile src/knexfile.ts migrate:latest && cd dist/src/ && node index.js"
-    # command to seed data: npx knex seed:run --knexfile src/knexfile.ts
-    
-  #add a postgres service
+    # Para sembrar: npx knex seed:run --knexfile src/knexfile.ts
+
   postgres:
     image: postgres:latest
     container_name: postgres
+    # 🔐 Tomar user/pass/db desde el mismo .env del backend
+    env_file:
+      - ./services/backend/.env
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: jwt_api
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    # (Opcional) Si no necesitás acceder desde tu host, podés quitar esta línea
     ports:
       - "5432:5432"
     volumes:
