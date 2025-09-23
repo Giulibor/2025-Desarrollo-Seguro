@@ -76,9 +76,22 @@ class InvoiceService {
     if (!invoice) {
       throw new Error('Invoice not found');
     }
+
+    const baseDir = path.resolve('./invoices');
+    const requestedPath = path.resolve(baseDir, pdfName);
+
+    if (!requestedPath.startsWith(baseDir)) {
+      console.error('Intento de path traversal detectado: ', requestedPath);
+      throw new Error('Invalid file path');
+    }
+
+    if(!pdfName.endsWith('.pdf')) {
+      console.error('Archivo no permitido: ', pdfName);
+      throw new Error('Invalid file type');
+    }
+
     try {
-      const filePath = `/invoices/${pdfName}`;
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = await fs.readFile(requestedPath);
       return content;
     } catch (error) {
       // send the error to the standard output
