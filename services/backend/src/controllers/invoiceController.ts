@@ -1,72 +1,101 @@
+// src/controllers/invoiceController.ts
 import { Request, Response, NextFunction } from 'express';
 import InvoiceService from '../services/invoiceService';
-import { Invoice } from '../types/invoice';
 
-const listInvoices = async (req: Request, res: Response, next: NextFunction) => {
+interface AuthRequest extends Request {
+  user?: { id: string };
+}
+
+const ALLOWED_OPERATORS = new Set(['=', '!=']);
+// (Opcional) si querés endurecer status:
+// const ALLOWED_STATUS = new Set(['paid', 'unpaid']);
+
+const listInvoices = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const state = req.query.status as string | undefined;
-    const operator = req.query.operator as string | undefined;
-    const id   = (req as any).user!.id; 
-    const invoices = await InvoiceService.list(id, state,operator);
-    res.json(invoices);
+    const userId = String(req.user?.id); // ← del JWT (middleware)
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const status =
+      typeof req.query.status === 'string' && req.query.status.trim().length > 0
+        ? req.query.status.trim()
+        : undefined;
+
+    const operatorRaw =
+      typeof req.query.operator === 'string' && req.query.operator.trim().length > 0
+        ? req.query.operator.trim()
+        : '=';
+
+    // Validación de operador (refuerzo al fix de SQLi)
+    if (operatorRaw && !ALLOWED_OPERATORS.has(operatorRaw)) {
+      return res.status(400).json({ error: 'invalid operator' });
+    }
+
+    // (Opcional) validar status
+    // if (status && !ALLOWED_STATUS.has(status)) {
+    //   return res.status(400).json({ error: 'invalid status' });
+    // }
+
+    const invoices = await InvoiceService.list(userId, status, operatorRaw);
+    return res.json(invoices);
   } catch (err) {
-    next(err);
+    return next(err);
   }
 };
 
-const setPaymentCard = async (req: Request, res: Response, next: NextFunction) => {
+const setPaymentCard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const invoiceId = req.params.id;
-    const paymentBrand = req.body.paymentBrand;
-    const ccNumber = req.body.ccNumber;
-    const ccv = req.body.ccv;
-    const expirationDate = req.body.expirationDate;
+    const userId = String(req.user?.id);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const invoiceId = String(req.params.id);
+    const { paymentBrand, ccNumber, ccv, expirationDate } = req.body || {};
 
     if (!paymentBrand || !ccNumber || !ccv || !expirationDate) {
       return res.status(400).json({ error: 'Missing payment details' });
     }
-    const id   = (req as any).user!.id; 
-    await InvoiceService.setPaymentCard(
-      id,
-      invoiceId,
-      paymentBrand,
-      ccNumber,
-      ccv,
-      expirationDate
-    );
 
-    res.status(200).json({ message: 'Payment successful' });
+    await InvoiceService.setPaymentCard(userId, invoiceId, paymentBrand, ccNumber, ccv, expirationDate);
+    return res.status(200).json({ message: 'Payment successful' });
   } catch (err) {
-    next(err);
+    return next(err);
   }
 };
 
-const getInvoicePDF = async (req: Request, res: Response, next: NextFunction) => {
+const getInvoicePDF = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const invoiceId = req.params.id;
-    const pdfName = req.query.pdfName as string | undefined;
+    const userId = String(req.user?.id);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    const invoiceId = String(req.params.id);
+    const pdfName = typeof req.query.pdfName === 'string' ? req.query.pdfName : undefined;
     if (!pdfName) {
       return res.status(400).json({ error: 'Missing parameter pdfName' });
     }
-    const pdf = await InvoiceService.getReceipt(invoiceId, pdfName);
-    // return the pdf as a binary response
-    res.setHeader('Content-Type', 'application/pdf');
-    res.send(pdf);
 
+    // ✅ se pasa userId al service para evitar IDOR
+    const pdf = await InvoiceService.getReceipt(userId, invoiceId, pdfName);
+
+    // Si el service retorna texto, podrías usar 'text/plain'; lo dejo en pdf por compatibilidad con tu UI
+    res.setHeader('Content-Type', 'application/pdf');
+    return res.send(pdf);
   } catch (err) {
-    next(err);
+    // 404 si no existe o no es del usuario
+    return res.status(404).json({ error: 'Receipt not found' });
   }
 };
 
-const getInvoice = async (req: Request, res: Response, next: NextFunction) => {
+const getInvoice = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const invoiceId = req.params.id;
-    const invoice = await InvoiceService.getInvoice(invoiceId);
-    res.status(200).json(invoice);
+    const userId = String(req.user?.id);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    const invoiceId = String(req.params.id);
+
+    // ✅ se pasa userId al service para evitar IDOR
+    const invoice = await InvoiceService.getInvoice(userId, invoiceId);
+    return res.status(200).json(invoice);
   } catch (err) {
-    next(err);
+    return res.status(404).json({ error: 'Invoice not found' });
   }
 };
 
@@ -74,5 +103,5 @@ export default {
   listInvoices,
   setPaymentCard,
   getInvoice,
-  getInvoicePDF
+  getInvoicePDF,
 };
